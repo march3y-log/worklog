@@ -192,6 +192,7 @@ button:active { transform: scale(0.98); }
       <div class="export-row">
         <button onclick="exportToCalendar()">カレンダーに日記を保存</button>
         <button onclick="exportToDocs()">Docsに日報を出力</button>
+        <button onclick="exportToSheets()">Sheetsに工数を記録</button>
       </div>
       <div class="status-msg" id="status-msg"></div>
     </div>
@@ -204,7 +205,8 @@ const CLIENT_ID = '784771473241-15toqdthnacna0k2g193jf9h0c64lnds.apps.googleuser
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/documents',
-  'https://www.googleapis.com/auth/tasks'
+  'https://www.googleapis.com/auth/tasks',
+  'https://www.googleapis.com/auth/spreadsheets'
 ].join(' ');
 
 let timerInterval = null;
@@ -215,6 +217,8 @@ let logs = [];
 let todos = [];
 let tokenClient = null;
 let accessToken = null;
+let projectHistory = [];
+let sheetsId = null;
 
 const today = new Date();
 document.getElementById('date-label').textContent = today.toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
@@ -230,6 +234,9 @@ function loadFromStorage() {
       todos = data.todos || [];
       if (data.diary) document.getElementById('diary-area').value = data.diary;
     }
+    projectHistory = JSON.parse(localStorage.getItem('worklog_projects') || '[]');
+    sheetsId = localStorage.getItem('worklog_sheets_id') || null;
+    renderProjectHistory();
   } catch(e) {}
   renderLogs(); renderTodos(); renderSummary();
 }
@@ -268,6 +275,11 @@ function stopTimer() {
     endTime: end.toLocaleTimeString('ja-JP', {hour:'2-digit',minute:'2-digit'}),
     project, memo, seconds: timerSeconds
   });
+  if (project && !projectHistory.includes(project)) {
+    projectHistory.push(project);
+    localStorage.setItem('worklog_projects', JSON.stringify(projectHistory));
+    renderProjectHistory();
+  }
   timerSeconds = 0;
   document.getElementById('timer-display').textContent = '00:00:00';
   document.getElementById('timer-memo').value = '';
@@ -300,6 +312,12 @@ function renderSummary() {
   `).join('');
 }
 
+function renderProjectHistory() {
+  const dl = document.getElementById('project-list');
+  const presets = ['企画・提案','制作・開発','ミーティング','事務・管理','その他'];
+  const all = [...new Set([...presets, ...projectHistory])];
+  dl.innerHTML = all.map(p => `<option value="${p}">`).join('');
+}
 function addTodo() {
   const input = document.getElementById('todo-input');
   const text = input.value.trim();
@@ -439,7 +457,38 @@ async function exportToDocs() {
   } catch(e) { setStatus('エラー: ' + e.message); }
 }
 
-document.getElementById('diary-area').addEventListener('input', saveToStorage);
+async function exportToSheets() {
+  if (!accessToken) { setStatus('先にGoogleでサインインしてください'); return; }
+  if (!logs.length) { setStatus('作業ログがありません'); return; }
+  setStatus('Sheetsに記録中...');
+  const dateStr = today.toLocaleDateString('ja-JP');
+  const rows = logs.map(l => [dateStr, l.project, l.startTime, l.endTime, Math.round(l.seconds/60), secToHM(l.seconds), l.memo||'']);
+  try {
+    if (!sheetsId) {
+      const createRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer '+accessToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ properties: { title: 'WorkLog 工数記録' }, sheets: [{ properties: { title: '記録' } }] })
+      });
+      const sheet = await createRes.json();
+      sheetsId = sheet.spreadsheetId;
+      localStorage.setItem('worklog_sheets_id', sheetsId);
+      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetsId}/values/記録!A1:G1:append?valueInputOption=RAW`, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer '+accessToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: [['日付','プロジェクト','開始','終了','分','合計','メモ']] })
+      });
+    }
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetsId}/values/記録!A1:append?valueInputOption=RAW`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer '+accessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: rows })
+    });
+    setStatus(`Sheetsに${rows.length}件の記録を追加しました`);
+  } catch(e) { setStatus('エラー: ' + e.message); }
+}
+
+
 loadFromStorage();
 </script>
 </body>
