@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WorkLog</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f5f5f3;
+  color: #1a1a18;
+  padding: 1.5rem;
+  min-height: 100vh;
+}
+.app { max-width: 960px; margin: 0 auto; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+.header h1 { font-size: 20px; font-weight: 500; }
+.date-label { font-size: 13px; color: #666; }
+
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+.full-card { grid-column: 1 / -1; }
+
+.card {
+  background: #fff;
+  border: 0.5px solid rgba(0,0,0,0.12);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+}
+.card-title { font-size: 12px; color: #888; margin-bottom: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+
+.timer-display { font-size: 44px; font-weight: 400; text-align: center; letter-spacing: 3px; margin: 0.5rem 0; font-variant-numeric: tabular-nums; }
+select, input[type=text], textarea {
+  width: 100%;
+  border: 0.5px solid rgba(0,0,0,0.15);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #fff;
+  color: #1a1a18;
+  outline: none;
+  transition: border-color 0.15s;
+}
+select:focus, input:focus, textarea:focus { border-color: rgba(0,0,0,0.35); }
+textarea { resize: none; }
+.timer-memo { height: 44px; margin-top: 0.5rem; }
+.timer-btns { display: flex; gap: 8px; margin-top: 0.75rem; }
+button {
+  border: 0.5px solid rgba(0,0,0,0.15);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #fff;
+  color: #1a1a18;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+button:hover { background: #f0f0ee; }
+button:active { transform: scale(0.98); }
+.timer-btns button { flex: 1; }
+.btn-start { background: #e8f5ee !important; color: #1a6b3a !important; border-color: #a8d8ba !important; }
+.btn-start:hover { background: #d4eddf !important; }
+.btn-stop { background: #fdecea !important; color: #b52a1e !important; border-color: #f5b5b0 !important; }
+.btn-stop:hover { background: #fad5d2 !important; }
+
+/* TODO */
+.todo-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+.todo-header-row .card-title { margin-bottom: 0; }
+.btn-tasks { font-size: 11px; padding: 4px 10px; color: #1a4a9a; border-color: #b5cdf5; background: #e8f0fb; }
+.btn-tasks:hover { background: #d4e4f7 !important; }
+.btn-tasks.loading { color: #888; border-color: #ddd; background: #f5f5f5; }
+
+.todo-input-row { display: flex; gap: 8px; margin-bottom: 0.75rem; }
+.todo-input-row input { flex: 1; }
+.todo-input-row button { white-space: nowrap; }
+.todo-list { list-style: none; max-height: 200px; overflow-y: auto; }
+.todo-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 0.5px solid rgba(0,0,0,0.08); font-size: 13px; }
+.todo-item:last-child { border-bottom: none; }
+.todo-item input[type=checkbox] { cursor: pointer; width: 15px; height: 15px; flex-shrink: 0; }
+.todo-item.done span { text-decoration: line-through; color: #aaa; }
+.todo-badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #e8f0fb; color: #1a4a9a; flex-shrink: 0; }
+.todo-del { margin-left: auto; cursor: pointer; color: #bbb; font-size: 16px; background: none; border: none; padding: 0 4px; flex-shrink: 0; }
+.todo-del:hover { color: #888; background: none; }
+
+/* Log */
+.log-list { max-height: 220px; overflow-y: auto; }
+.log-item { display: flex; align-items: flex-start; gap: 8px; padding: 7px 0; border-bottom: 0.5px solid rgba(0,0,0,0.08); }
+.log-item:last-child { border-bottom: none; }
+.log-time { font-size: 11px; color: #888; min-width: 100px; padding-top: 2px; }
+.log-project { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: #e8f0fb; color: #1a4a9a; white-space: nowrap; flex-shrink: 0; }
+.log-body { flex: 1; }
+.log-memo { font-size: 12px; color: #888; margin-top: 2px; }
+.log-duration { font-size: 12px; color: #888; white-space: nowrap; padding-top: 2px; }
+
+.summary-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.summary-item { background: #f5f5f3; border-radius: 8px; padding: 0.5rem 0.75rem; }
+.summary-item .proj { font-size: 11px; color: #888; }
+.summary-item .hours { font-size: 16px; font-weight: 500; }
+
+.diary-area { height: 110px; }
+
+.auth-banner {
+  background: #e8f0fb;
+  border: 0.5px solid #b5cdf5;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.auth-banner p { font-size: 13px; color: #1a4a9a; }
+.auth-banner button { font-size: 13px; white-space: nowrap; background: #fff; border-color: #b5cdf5; }
+.export-row { display: flex; gap: 8px; }
+.export-row button { flex: 1; font-size: 13px; }
+.status-msg { font-size: 12px; color: #888; margin-top: 0.5rem; text-align: center; min-height: 18px; }
+
+.empty { font-size: 13px; color: #bbb; padding: 4px 0; }
+
+.tasks-status { font-size: 11px; color: #888; margin-bottom: 0.5rem; }
+
+@media (max-width: 600px) {
+  .grid { grid-template-columns: 1fr; }
+  .full-card { grid-column: 1; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>WorkLog</h1>
+    <span class="date-label" id="date-label"></span>
+  </div>
+
+  <div class="auth-banner" id="auth-banner">
+    <p>Googleアカウントでサインインするとカレンダー・Docs・Tasksと連携できます</p>
+    <button onclick="handleAuth()">Googleでサインイン</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-title">タイマー</div>
+      <select id="project-select">
+        <option value="">プロジェクトを選択...</option>
+        <option>企画・提案</option>
+        <option>制作・開発</option>
+        <option>ミーティング</option>
+        <option>事務・管理</option>
+        <option>その他</option>
+      </select>
+      <div class="timer-display" id="timer-display">00:00:00</div>
+      <textarea class="timer-memo" id="timer-memo" placeholder="メモ（任意）"></textarea>
+      <div class="timer-btns">
+        <button class="btn-start" onclick="startTimer()">スタート</button>
+        <button class="btn-stop" onclick="stopTimer()">ストップ</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="todo-header-row">
+        <div class="card-title">TODOリスト</div>
+        <button class="btn-tasks" id="btn-tasks" onclick="fetchGoogleTasks()">Google Tasksを取得</button>
+      </div>
+      <div class="tasks-status" id="tasks-status"></div>
+      <div class="todo-input-row">
+        <input type="text" id="todo-input" placeholder="タスクを追加..." onkeydown="if(event.key==='Enter')addTodo()">
+        <button onclick="addTodo()">追加</button>
+      </div>
+      <ul class="todo-list" id="todo-list"></ul>
+    </div>
+
+    <div class="card full-card">
+      <div class="card-title">本日の作業ログ</div>
+      <div class="log-list" id="log-list"><p class="empty">まだ記録がありません</p></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">プロジェクト別合計</div>
+      <div class="summary-row" id="summary-row"><p class="empty">記録がありません</p></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">日記・メモ</div>
+      <textarea class="diary-area" id="diary-area" placeholder="今日の振り返り、気づき、プライベートメモなど..."></textarea>
+    </div>
+
+    <div class="card full-card">
+      <div class="card-title">Google連携</div>
+      <div class="export-row">
+        <button onclick="exportToCalendar()">カレンダーに日記を保存</button>
+        <button onclick="exportToDocs()">Docsに日報を出力</button>
+      </div>
+      <div class="status-msg" id="status-msg"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script>
+const CLIENT_ID = '784771473241-15toqdthnacna0k2g193jf9h0c64lnds.apps.googleusercontent.com';
+const SCOPES = [
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/documents',
+  'https://www.googleapis.com/auth/tasks'
+].join(' ');
+
+let timerInterval = null;
+let timerStart = null;
+let timerSeconds = 0;
+let isRunning = false;
+let logs = [];
+let todos = [];
+let tokenClient = null;
+let accessToken = null;
+
+const today = new Date();
+document.getElementById('date-label').textContent = today.toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+
+function todayKey() { return 'worklog_' + today.toISOString().split('T')[0]; }
+
+function loadFromStorage() {
+  try {
+    const saved = localStorage.getItem(todayKey());
+    if (saved) {
+      const data = JSON.parse(saved);
+      logs = data.logs || [];
+      todos = data.todos || [];
+      if (data.diary) document.getElementById('diary-area').value = data.diary;
+    }
+  } catch(e) {}
+  renderLogs(); renderTodos(); renderSummary();
+}
+
+function saveToStorage() {
+  try {
+    localStorage.setItem(todayKey(), JSON.stringify({
+      logs, todos, diary: document.getElementById('diary-area').value
+    }));
+  } catch(e) {}
+}
+
+function pad(n) { return String(n).padStart(2,'0'); }
+function secToHMS(s) { return pad(Math.floor(s/3600))+':'+pad(Math.floor((s%3600)/60))+':'+pad(s%60); }
+function secToHM(s) { const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?h+'時間'+m+'分':m+'分'; }
+
+function startTimer() {
+  if (isRunning) return;
+  isRunning = true;
+  timerStart = new Date();
+  timerInterval = setInterval(() => {
+    timerSeconds++;
+    document.getElementById('timer-display').textContent = secToHMS(timerSeconds);
+  }, 1000);
+}
+
+function stopTimer() {
+  if (!isRunning) return;
+  isRunning = false;
+  clearInterval(timerInterval);
+  const end = new Date();
+  const project = document.getElementById('project-select').value || 'その他';
+  const memo = document.getElementById('timer-memo').value;
+  logs.push({
+    startTime: timerStart.toLocaleTimeString('ja-JP', {hour:'2-digit',minute:'2-digit'}),
+    endTime: end.toLocaleTimeString('ja-JP', {hour:'2-digit',minute:'2-digit'}),
+    project, memo, seconds: timerSeconds
+  });
+  timerSeconds = 0;
+  document.getElementById('timer-display').textContent = '00:00:00';
+  document.getElementById('timer-memo').value = '';
+  renderLogs(); renderSummary(); saveToStorage();
+}
+
+function renderLogs() {
+  const el = document.getElementById('log-list');
+  if (!logs.length) { el.innerHTML = '<p class="empty">まだ記録がありません</p>'; return; }
+  el.innerHTML = logs.map(l => `
+    <div class="log-item">
+      <span class="log-time">${l.startTime} 〜 ${l.endTime}</span>
+      <span class="log-project">${l.project}</span>
+      <div class="log-body">${l.memo ? `<div class="log-memo">${l.memo}</div>` : ''}</div>
+      <span class="log-duration">${secToHM(l.seconds)}</span>
+    </div>
+  `).join('');
+}
+
+function renderSummary() {
+  const el = document.getElementById('summary-row');
+  if (!logs.length) { el.innerHTML = '<p class="empty">記録がありません</p>'; return; }
+  const map = {};
+  logs.forEach(l => { map[l.project] = (map[l.project]||0) + l.seconds; });
+  el.innerHTML = Object.entries(map).map(([p,s]) => `
+    <div class="summary-item">
+      <div class="proj">${p}</div>
+      <div class="hours">${secToHM(s)}</div>
+    </div>
+  `).join('');
+}
+
+function addTodo() {
+  const input = document.getElementById('todo-input');
+  const text = input.value.trim();
+  if (!text) return;
+  todos.push({ text, done: false, source: 'manual' });
+  input.value = '';
+  renderTodos(); saveToStorage();
+}
+
+function toggleTodo(i) { todos[i].done = !todos[i].done; renderTodos(); saveToStorage(); }
+function deleteTodo(i) { todos.splice(i,1); renderTodos(); saveToStorage(); }
+
+function renderTodos() {
+  const el = document.getElementById('todo-list');
+  if (!todos.length) { el.innerHTML = '<li class="empty" style="list-style:none;padding:6px 0">タスクはありません</li>'; return; }
+  el.innerHTML = todos.map((t,i) => `
+    <li class="todo-item ${t.done?'done':''}">
+      <input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo(${i})">
+      <span>${t.text}</span>
+      ${t.source==='tasks' ? '<span class="todo-badge">Tasks</span>' : ''}
+      <button class="todo-del" onclick="deleteTodo(${i})">×</button>
+    </li>
+  `).join('');
+}
+
+function setStatus(msg) { document.getElementById('status-msg').textContent = msg; }
+function setTasksStatus(msg) { document.getElementById('tasks-status').textContent = msg; }
+
+function handleAuth() {
+  if (!window.google) { setStatus('Google APIを読み込み中です...'); setTimeout(handleAuth,1000); return; }
+  if (!tokenClient) {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: (resp) => {
+        if (resp.error) { setStatus('サインインに失敗しました: ' + resp.error); return; }
+        accessToken = resp.access_token;
+        document.getElementById('auth-banner').style.display = 'none';
+        setStatus('Googleアカウントと連携しました');
+      }
+    });
+  }
+  tokenClient.requestAccessToken();
+}
+
+async function fetchGoogleTasks() {
+  if (!accessToken) { setTasksStatus('先にGoogleでサインインしてください'); return; }
+  const btn = document.getElementById('btn-tasks');
+  btn.textContent = '取得中...';
+  btn.classList.add('loading');
+  setTasksStatus('');
+  try {
+    const listRes = await fetch('https://tasks.googleapis.com/tasks/v1/users/@me/lists', {
+      headers: { 'Authorization': 'Bearer ' + accessToken }
+    });
+    const listData = await listRes.json();
+    const lists = listData.items || [];
+    if (!lists.length) { setTasksStatus('タスクリストが見つかりませんでした'); return; }
+
+    let allTasks = [];
+    for (const list of lists) {
+      const taskRes = await fetch(
+        `https://tasks.googleapis.com/tasks/v1/lists/${list.id}/tasks?showCompleted=false&maxResults=50`,
+        { headers: { 'Authorization': 'Bearer ' + accessToken } }
+      );
+      const taskData = await taskRes.json();
+      const tasks = (taskData.items || []).filter(t => t.status !== 'completed');
+      tasks.forEach(t => allTasks.push({ text: t.title, done: false, source: 'tasks', taskId: t.id, listId: list.id }));
+    }
+
+    if (!allTasks.length) { setTasksStatus('未完了のタスクはありません'); btn.textContent = 'Google Tasksを取得'; btn.classList.remove('loading'); return; }
+
+    const existingTexts = todos.map(t => t.text);
+    let added = 0;
+    allTasks.forEach(t => {
+      if (!existingTexts.includes(t.text)) {
+        todos.push(t);
+        added++;
+      }
+    });
+
+    renderTodos(); saveToStorage();
+    setTasksStatus(added > 0 ? `${added}件のタスクを追加しました` : '新しいタスクはありませんでした');
+  } catch(e) {
+    setTasksStatus('エラー: ' + e.message);
+  }
+  btn.textContent = 'Google Tasksを取得';
+  btn.classList.remove('loading');
+}
+
+async function exportToCalendar() {
+  if (!accessToken) { setStatus('先にGoogleでサインインしてください'); return; }
+  const diary = document.getElementById('diary-area').value;
+  if (!diary.trim()) { setStatus('日記・メモを入力してください'); return; }
+  setStatus('カレンダーに保存中...');
+  const dateStr = today.toISOString().split('T')[0];
+  try {
+    const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer '+accessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        summary: '日記 ' + today.toLocaleDateString('ja-JP'),
+        description: diary,
+        start: { date: dateStr },
+        end: { date: dateStr }
+      })
+    });
+    if (res.ok) setStatus('Googleカレンダーに日記を保存しました');
+    else setStatus('エラー: ' + res.status);
+  } catch(e) { setStatus('エラー: ' + e.message); }
+}
+
+async function exportToDocs() {
+  if (!accessToken) { setStatus('先にGoogleでサインインしてください'); return; }
+  if (!logs.length) { setStatus('作業ログがありません'); return; }
+  setStatus('Google Docsに日報を作成中...');
+  const dateStr = today.toLocaleDateString('ja-JP');
+  const logText = logs.map(l => `${l.startTime}〜${l.endTime}  [${l.project}]  ${secToHM(l.seconds)}${l.memo?'\n  '+l.memo:''}`).join('\n');
+  const map = {};
+  logs.forEach(l => { map[l.project]=(map[l.project]||0)+l.seconds; });
+  const summaryText = Object.entries(map).map(([p,s]) => `${p}: ${secToHM(s)}`).join('  /  ');
+  const todoText = todos.map(t => (t.done?'[完了] ':'[  ] ')+t.text).join('\n');
+  const content = `【日報】${dateStr}\n\n■ 作業ログ\n${logText}\n\n■ プロジェクト別合計\n${summaryText}\n\n■ TODOリスト\n${todoText||'なし'}\n\n■ 日記・メモ\n${document.getElementById('diary-area').value||'なし'}`;
+  try {
+    const createRes = await fetch('https://docs.googleapis.com/v1/documents', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer '+accessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: `日報_${dateStr}` })
+    });
+    const doc = await createRes.json();
+    await fetch(`https://docs.googleapis.com/v1/documents/${doc.documentId}:batchUpdate`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer '+accessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requests: [{ insertText: { location: { index: 1 }, text: content } }] })
+    });
+    setStatus(`日報をGoogle Docsに作成しました（${dateStr}）`);
+  } catch(e) { setStatus('エラー: ' + e.message); }
+}
+
+document.getElementById('diary-area').addEventListener('input', saveToStorage);
+loadFromStorage();
+</script>
+</body>
+</html>
