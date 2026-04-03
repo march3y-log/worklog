@@ -143,14 +143,14 @@ button:active { transform: scale(0.98); }
   <div class="grid">
     <div class="card">
       <div class="card-title">タイマー</div>
-      <select id="project-select">
-        <option value="">プロジェクトを選択...</option>
-        <option>企画・提案</option>
-        <option>制作・開発</option>
-        <option>ミーティング</option>
-        <option>事務・管理</option>
-        <option>その他</option>
-      </select>
+      <input type="text" id="project-select" list="project-list" placeholder="プロジェクト名を入力または選択...">
+      <datalist id="project-list">
+        <option value="企画・提案">
+        <option value="制作・開発">
+        <option value="ミーティング">
+        <option value="事務・管理">
+        <option value="その他">
+      </datalist>
       <div class="timer-display" id="timer-display">00:00:00</div>
       <textarea class="timer-memo" id="timer-memo" placeholder="メモ（任意）"></textarea>
       <div class="timer-btns">
